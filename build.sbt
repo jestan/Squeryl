@@ -3,7 +3,7 @@ name := "squeryl"
 
 organization := "org.squeryl"
 
-version := "0.9.5-RC1"
+version := "0.9.5-rc1-proxy"
 
 version <<= version { v => 
   val snapshot = Option(System.getProperty("snapshot")) == Some("true")
@@ -44,14 +44,14 @@ parallelExecution := false
 publishMavenStyle := true
 
 publishTo <<= (version) { version: String =>
-  val nexus = "http://nexus.scala-tools.org/content/repositories/"
+  val repo = "http://192.168.0.7:8080/archiva/repository/"
   if (version.trim.endsWith("SNAPSHOT")) 
-    Some("Scala Tools Snapshots" at nexus + "snapshots/") 
+    Some("Repository Archiva Managed snapshots Repository" at repo + "snapshots/")
   else
-    Some("Scala Tools Releases" at nexus + "releases/")
+    Some("Repository Archiva Managed internal Repository" at repo + "internal/")
 }
 
-credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
+credentials += Credentials("Repository Archiva Managed internal Repository", "192.168.0.7", "xxxx", "xxxx")
 
 pomExtra :=
     <licenses>

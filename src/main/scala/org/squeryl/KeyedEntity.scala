@@ -77,8 +77,6 @@ trait IndirectKeyedEntity[K,T] extends KeyedEntity[K] {
 
 
 trait Optimistic {
-  self: KeyedEntity[_] =>
-
   protected val occVersionNumber = 0
 }
 
