@@ -32,6 +32,8 @@ trait Schema {
    */
   private val _tables = new ArrayBuffer[Table[_]] 
   
+  def tables: Seq[Table[_]] = _tables.toSeq
+  
   private val _tableTypes = new HashMap[Class[_], Table[_]]
 
   private val _oneToManyRelations = new ArrayBuffer[OneToManyRelation[_,_]]
@@ -558,7 +560,7 @@ trait Schema {
     new LifecycleEventPercursorClass[A](m.erasure, this, BeforeInsert)
 
   protected def beforeUpdate[A](t: Table[A]) =
-    new LifecycleEventPercursorTable[A](t, BeforeInsert)
+    new LifecycleEventPercursorTable[A](t, BeforeUpdate)
 
   protected def beforeUpdate[A]()(implicit m: Manifest[A]) =
     new LifecycleEventPercursorClass[A](m.erasure, this, BeforeUpdate)

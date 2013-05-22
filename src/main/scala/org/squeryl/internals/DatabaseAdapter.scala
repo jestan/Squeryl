@@ -312,7 +312,7 @@ trait DatabaseAdapter {
   protected def execFailSafeExecute(sw: StatementWriter, silenceException: SQLException => Boolean): Unit = {
     val s = Session.currentSession
     val c = s.connection
-    val stat = c.createStatement
+    val stat = createStatement(c)
     val sp =
       if(failureOfStatementRequiresRollback) Some(c.setSavepoint)
       else None
@@ -349,20 +349,28 @@ trait DatabaseAdapter {
     _exec[A](s, sw, block, p)
   }
 
+  protected def prepareStatement(conn: Connection, statement: String): PreparedStatement =
+    conn.prepareStatement(statement)
+
+  protected def createStatement(conn: Connection): Statement =
+    conn.createStatement()
+
   def executeQuery(s: Session, sw: StatementWriter) = exec(s, sw) { params =>
-    val st = s.connection.prepareStatement(sw.statement)
+    val st = prepareStatement(s.connection, sw.statement)
     fillParamsInto(params, st)
     (st.executeQuery, st)
   }
 
   def executeUpdate(s: Session, sw: StatementWriter):(Int,PreparedStatement) = exec(s, sw) { params =>
-    val st = s.connection.prepareStatement(sw.statement)
+    val st = prepareStatement(s.connection, sw.statement)
     fillParamsInto(params, st)
     (st.executeUpdate, st)
   }
 
   def executeUpdateAndCloseStatement(s: Session, sw: StatementWriter): Int = exec(s, sw) { params =>
-    val st = s.connection.prepareStatement(sw.statement)
+    if(s.isLoggingEnabled)
+      s.log(sw.toString)
+    val st = prepareStatement(s.connection, sw.statement)
     fillParamsInto(params, st)
     try {
       st.executeUpdate
@@ -373,6 +381,8 @@ trait DatabaseAdapter {
   }
 
   def executeUpdateForInsert(s: Session, sw: StatementWriter, ps: PreparedStatement) = exec(s, sw) { params =>
+    if(s.isLoggingEnabled)
+      s.log(sw.toString)
     fillParamsInto(params, ps)
     ps.executeUpdate
   }
@@ -493,11 +503,14 @@ trait DatabaseAdapter {
     t.posoMetaData.primaryKey.getOrElse(org.squeryl.internals.Utils.throwError("writeUpdate was called on an object that does not extend from KeyedEntity[]")).fold(
       pkMd => sw.write(quoteName(pkMd.columnName), " = ", writeValue(o_, pkMd, sw)),
       pkGetter => {
-        val astOfQuery4WhereClause = Utils.createQuery4WhereClause(t, (t0:T) =>
-          pkGetter.invoke(t0).asInstanceOf[CompositeKey].buildEquality(o.asInstanceOf[KeyedEntity[CompositeKey]].id))
+        Utils.createQuery4WhereClause(t, (t0:T) => {
+          val ck = pkGetter.invoke(t0).asInstanceOf[CompositeKey]
 
-        astOfQuery4WhereClause.inhibitAliasOnSelectElementReference = true
-        astOfQuery4WhereClause.whereClause.get.write(sw)
+          val fieldWhere = ck._fields map (fmd => quoteName(fmd.columnName) + " = " + writeValue(o_, fmd, sw))
+          sw.write(fieldWhere.mkString(" and "))
+
+          new EqualityExpression(new InputOnlyConstantExpressionNode(1), new InputOnlyConstantExpressionNode(1))
+        })
       }
     )
 
